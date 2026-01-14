@@ -1,9 +1,15 @@
 --[[
-    🎮 JEM FARM HUB v2 [TP to NPC Edition]
-    - Auto Skill (MadaraThird)
-    - Mob Bring (รวบมอน)
-    - Auto Next: TP หา NPC ที่ workspace.Floors["0"].NPC
+    ☠️ JEM DUNGEON CLEARER [Auto Farm + Smart Exit]
+    - Teleport เหนือหัวมอน แล้วยิงสกิล
+    - มอนหมด -> หาปุ่ม E (ประตู) อัตโนมัติ -> วาปไปกด
 ]]
+
+-- CONFIGURATION
+local CONFIG = {
+    HeightOffset = 7,  -- ลอยเหนือหัวมอน 7 เมตร (ปรับได้)
+    SkillArgs = {"MadaraThird"}, -- สกิลที่จะใช้
+    AutoSkillDelay = 0.5, -- ความรัวของสกิล
+}
 
 -- SERVICES
 local Players = game:GetService("Players")
@@ -13,119 +19,123 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- SETTINGS
-local CONFIG = {
-    MobDistance = 15, -- ระยะรวบมอน
-    SkillRemoteArgs = {"MadaraThird"}, -- ชื่อสกิล
-    
-    -- เป้าหมายที่จะไปหาหลังจากมอนหมด
-    NpcPath = function() 
-        -- ค้นหา NPC ตาม Path ที่พี่ขอมา
-        local success, npc = pcall(function()
-            return workspace.Floors["0"].NPC 
-        end)
-        return success and npc or nil
-    end
-}
-
--- STATUS
+-- STATE
 local Toggles = {
-    AutoSkill = false,
-    MobBring = false,
-    AutoNext = false
+    AutoFarm = false,
 }
 
 ------------------------------------------------------
 -- 🖥️ GUI SYSTEM
 ------------------------------------------------------
-if CoreGui:FindFirstChild("JemFarmUI") then CoreGui.JemFarmUI:Destroy() end
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "JemFarmUI"; ScreenGui.Parent = CoreGui
-local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 220, 0, 250); MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35); MainFrame.Active = true; MainFrame.Draggable = true; MainFrame.Parent = ScreenGui
+if CoreGui:FindFirstChild("JemDungeonUI") then CoreGui.JemDungeonUI:Destroy() end
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "JemDungeonUI"; ScreenGui.Parent = CoreGui
+local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 150); MainFrame.Position = UDim2.new(0.5, -125, 0.2, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); MainFrame.Active = true; MainFrame.Draggable = true; MainFrame.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel"); Title.Text = "⚡ JEM HUB v2"; Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Color3.fromRGB(0, 120, 215); Title.TextColor3 = Color3.new(1, 1, 1); Title.Font = Enum.Font.GothamBold; Title.TextSize = 16; Title.Parent = MainFrame
+local Title = Instance.new("TextLabel"); Title.Text = "☠️ JEM DUNGEON CLEARER"; Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Color3.fromRGB(192, 57, 43); Title.TextColor3 = Color3.new(1, 1, 1); Title.Font = Enum.Font.GothamBold; Title.TextSize = 14; Title.Parent = MainFrame
 
-local function CreateButton(text, yPos, onClick)
-    local btn = Instance.new("TextButton")
-    btn.Text = text .. " [OFF]"; btn.Size = UDim2.new(0.9, 0, 0, 35); btn.Position = UDim2.new(0.05, 0, 0, yPos); btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); btn.TextColor3 = Color3.fromRGB(200, 200, 200); btn.Font = Enum.Font.Gotham; btn.Parent = MainFrame
-    local enabled = false
-    btn.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        if enabled then btn.Text = text.." [ON]"; btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113); btn.TextColor3 = Color3.new(1,1,1) else btn.Text = text.." [OFF]"; btn.BackgroundColor3 = Color3.fromRGB(60,60,60); btn.TextColor3 = Color3.fromRGB(200,200,200) end
-        onClick(enabled)
-    end)
-end
+local StatusLbl = Instance.new("TextLabel"); StatusLbl.Text = "Status: Idle"; StatusLbl.Size = UDim2.new(1, 0, 0, 30); StatusLbl.Position = UDim2.new(0, 0, 0, 40); StatusLbl.BackgroundTransparency = 1; StatusLbl.TextColor3 = Color3.fromRGB(255, 200, 0); StatusLbl.Font = Enum.Font.Gotham; StatusLbl.Parent = MainFrame
 
-CreateButton("🔥 Auto Skill", 50, function(val) Toggles.AutoSkill = val end)
-CreateButton("🧲 Mob Bring", 95, function(val) Toggles.MobBring = val end)
-CreateButton("⏩ Auto Next (NPC)", 140, function(val) Toggles.AutoNext = val end)
+local ToggleBtn = Instance.new("TextButton"); ToggleBtn.Text = "START AUTO FARM [OFF]"; ToggleBtn.Size = UDim2.new(0.9, 0, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0, 80); ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); ToggleBtn.TextColor3 = Color3.new(1, 1, 1); ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.Parent = MainFrame
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    Toggles.AutoFarm = not Toggles.AutoFarm
+    if Toggles.AutoFarm then
+        ToggleBtn.Text = "STOP AUTO FARM [ON]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    else
+        ToggleBtn.Text = "START AUTO FARM [OFF]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        StatusLbl.Text = "Status: Stopped"
+    end
+end)
 
 local CloseBtn = Instance.new("TextButton"); CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0); CloseBtn.BackgroundTransparency = 1; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.Parent = MainFrame; CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
 ------------------------------------------------------
--- ⚙️ FUNCTION LOGIC
+-- ⚙️ LOGIC SYSTEM
 ------------------------------------------------------
 
--- 1. AUTO SKILL
-task.spawn(function()
-    while true do task.wait(0.1)
-        if Toggles.AutoSkill then
-            pcall(function()
-                game:GetService("ReplicatedStorage").Remotes.AbilityHandler:FireServer(unpack(CONFIG.SkillRemoteArgs))
-            end)
+-- ฟังก์ชันหาปุ่ม E (ประตู/ทางไปต่อ)
+local function FindExitPrompt()
+    -- ค้นหา ProximityPrompt ทั่วแมพ (เพราะบางทีประตูไม่ได้ชื่อ Door)
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            return desc
         end
     end
-end)
+    return nil
+end
 
--- 2. MOB BRING
-RunService.RenderStepped:Connect(function()
-    if Toggles.MobBring then
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local mobFolder = workspace:FindFirstChild("Live")
-        if root and mobFolder then
-            local bringPos = root.CFrame * CFrame.new(0, 2, -CONFIG.MobDistance)
-            for _, mob in ipairs(mobFolder:GetChildren()) do
-                local mRoot = mob:FindFirstChild("HumanoidRootPart") or mob:FindFirstChild("Torso")
-                if mRoot then
-                    mRoot.CFrame = bringPos; mRoot.CanCollide = false; mRoot.Velocity = Vector3.zero
-                end
-            end
-        end
-    end
-end)
-
--- 3. AUTO NEXT (TP TO NPC)
 task.spawn(function()
     while true do
-        task.wait(1)
-        if Toggles.AutoNext then
+        task.wait()
+        if Toggles.AutoFarm then
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
             local mobFolder = workspace:FindFirstChild("Live")
-            -- ถ้ามอนหมดเกลี้ยง (หรือโฟลเดอร์หายไป)
-            if not mobFolder or #mobFolder:GetChildren() == 0 then
+
+            if root and mobFolder then
+                local mobs = mobFolder:GetChildren()
                 
-                local char = LocalPlayer.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local targetNPC = CONFIG.NpcPath() -- หา NPC ตาม Path
-                
-                if root and targetNPC then
-                    -- หาจุดยืนของ NPC (HumanoidRootPart หรือ PrimaryPart)
-                    local npcPart = targetNPC:FindFirstChild("HumanoidRootPart") or targetNPC:FindFirstChild("Torso") or targetNPC.PrimaryPart
+                -- [[ CASE 1: มีมอนเหลืออยู่ -> ไล่ฆ่า ]]
+                if #mobs > 0 then
+                    StatusLbl.Text = "⚔️ Killing Mobs: " .. #mobs .. " left"
                     
-                    if npcPart then
-                        -- เช็คระยะห่าง ถ้าไกลเกิน 5 เมตร ค่อยวาป (กันวาปรัวๆ)
-                        if (root.Position - npcPart.Position).Magnitude > 5 then
-                            print("🚀 Warping to NPC...")
-                            -- วาปไปข้างหน้า NPC นิดหน่อย (CFrame * offset)
-                            root.CFrame = npcPart.CFrame * CFrame.new(0, 0, -3) 
-                            task.wait(0.5)
+                    -- เลือกมอนตัวแรกที่เจอ
+                    local target = mobs[1]
+                    local tRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso")
+                    
+                    if tRoot then
+                        -- 1. วาปไปเหนือหัวมอน (มองลงล่าง)
+                        root.CFrame = CFrame.new(tRoot.Position + Vector3.new(0, CONFIG.HeightOffset, 0), tRoot.Position)
+                        
+                        -- 2. ล็อกความเร็วตัวเรา (กันร่วง)
+                        root.Velocity = Vector3.zero
+                        
+                        -- 3. ยิงสกิล
+                        pcall(function()
+                            game:GetService("ReplicatedStorage").Remotes.AbilityHandler:FireServer(unpack(CONFIG.SkillArgs))
+                        end)
+                        task.wait(CONFIG.AutoSkillDelay)
+                    else
+                        -- มอนตัวนี้บั๊ก/ตายแล้ว -> ลบมันออกจากสายตา (Client side) เพื่อไปตัวถัดไป
+                        target:Destroy()
+                    end
+                    
+                -- [[ CASE 2: มอนหมดเกลี้ยง -> หาทางออก ]]
+                else
+                    StatusLbl.Text = "🚪 Finding Exit..."
+                    local exitPrompt = FindExitPrompt()
+                    
+                    if exitPrompt and exitPrompt.Parent then
+                        -- วาปไปหาปุ่ม E
+                        local exitPart = exitPrompt.Parent
+                        if exitPart:IsA("BasePart") or exitPart:IsA("Model") then
+                            local exitPos = exitPart:IsA("Model") and exitPart:GetPivot().Position or exitPart.Position
                             
-                            -- กด E รัวๆ
-                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                            task.wait(0.1)
-                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            -- เช็กระยะ (ถ้าไกลค่อยวาป)
+                            if (root.Position - exitPos).Magnitude > 5 then
+                                root.CFrame = CFrame.new(exitPos + Vector3.new(0, 2, 0)) -- ยืนเหนือปุ่มนิดนึง
+                                StatusLbl.Text = "🚀 Warping to Exit..."
+                                task.wait(0.5)
+                            else
+                                -- ถึงแล้ว -> กด E รัวๆ
+                                StatusLbl.Text = "🔘 Pressing E..."
+                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                task.wait(0.1)
+                                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                
+                                -- สั่งกด ProximityPrompt โดยตรงด้วย (กันเหนียว)
+                                fireproximityprompt(exitPrompt) 
+                                task.wait(0.3)
+                            end
                         end
+                    else
+                        StatusLbl.Text = "⚠️ No Exit Found (Waiting...)"
+                        task.wait(1)
                     end
                 end
+            else
+                 -- กัน error กรณีตาย/แมพไม่โหลด
+                 task.wait(1)
             end
         end
     end
