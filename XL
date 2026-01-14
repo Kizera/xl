@@ -1,14 +1,14 @@
 --[[
-    ☠️ JEM DUNGEON CLEARER [Auto Farm + Smart Exit]
-    - Teleport เหนือหัวมอน แล้วยิงสกิล
-    - มอนหมด -> หาปุ่ม E (ประตู) อัตโนมัติ -> วาปไปกด
+    ☠️ JEM DUNGEON CLEARER V2 [Hover Edition]
+    - ลอยค้างฟ้า ไม่ตกลงพื้น (Anti-Gravity)
+    - ไล่ฆ่ามอน + หาประตูทางออกอัตโนมัติ
 ]]
 
 -- CONFIGURATION
 local CONFIG = {
-    HeightOffset = 7,  -- ลอยเหนือหัวมอน 7 เมตร (ปรับได้)
-    SkillArgs = {"MadaraThird"}, -- สกิลที่จะใช้
-    AutoSkillDelay = 0.5, -- ความรัวของสกิล
+    HeightOffset = 8,  -- ความสูงเหนือหัวมอน (เพิ่มให้สูงขึ้นนิดนึงจะได้ปลอดภัย)
+    SkillArgs = {"MadaraThird"}, 
+    AutoSkillDelay = 0.5, 
 }
 
 -- SERVICES
@@ -31,42 +31,58 @@ if CoreGui:FindFirstChild("JemDungeonUI") then CoreGui.JemDungeonUI:Destroy() en
 local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "JemDungeonUI"; ScreenGui.Parent = CoreGui
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 150); MainFrame.Position = UDim2.new(0.5, -125, 0.2, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); MainFrame.Active = true; MainFrame.Draggable = true; MainFrame.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel"); Title.Text = "☠️ JEM DUNGEON CLEARER"; Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Color3.fromRGB(192, 57, 43); Title.TextColor3 = Color3.new(1, 1, 1); Title.Font = Enum.Font.GothamBold; Title.TextSize = 14; Title.Parent = MainFrame
+local Title = Instance.new("TextLabel"); Title.Text = "☠️ JEM HOVER FARM V2"; Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Color3.fromRGB(142, 68, 173); Title.TextColor3 = Color3.new(1, 1, 1); Title.Font = Enum.Font.GothamBold; Title.TextSize = 14; Title.Parent = MainFrame
 
 local StatusLbl = Instance.new("TextLabel"); StatusLbl.Text = "Status: Idle"; StatusLbl.Size = UDim2.new(1, 0, 0, 30); StatusLbl.Position = UDim2.new(0, 0, 0, 40); StatusLbl.BackgroundTransparency = 1; StatusLbl.TextColor3 = Color3.fromRGB(255, 200, 0); StatusLbl.Font = Enum.Font.Gotham; StatusLbl.Parent = MainFrame
 
-local ToggleBtn = Instance.new("TextButton"); ToggleBtn.Text = "START AUTO FARM [OFF]"; ToggleBtn.Size = UDim2.new(0.9, 0, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0, 80); ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); ToggleBtn.TextColor3 = Color3.new(1, 1, 1); ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.Parent = MainFrame
+local ToggleBtn = Instance.new("TextButton"); ToggleBtn.Text = "START HOVER FARM [OFF]"; ToggleBtn.Size = UDim2.new(0.9, 0, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0, 80); ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); ToggleBtn.TextColor3 = Color3.new(1, 1, 1); ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.Parent = MainFrame
+
+-- ฟังก์ชันจัดการ BodyVelocity (ตัวช่วยบิน)
+local function ToggleHover(state)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if state then
+            -- สร้างแรงยก
+            local bv = root:FindFirstChild("JemHover") or Instance.new("BodyVelocity")
+            bv.Name = "JemHover"
+            bv.Parent = root
+            bv.MaxForce = Vector3.new(100000, 100000, 100000) -- แรงเยอะๆ ให้สู้แรงโน้มถ่วงได้
+            bv.Velocity = Vector3.zero -- ให้หยุดนิ่งๆ
+        else
+            -- ลบแรงยก (กลับสู่ปกติ)
+            local bv = root:FindFirstChild("JemHover")
+            if bv then bv:Destroy() end
+        end
+    end
+end
 
 ToggleBtn.MouseButton1Click:Connect(function()
     Toggles.AutoFarm = not Toggles.AutoFarm
     if Toggles.AutoFarm then
-        ToggleBtn.Text = "STOP AUTO FARM [ON]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        ToggleBtn.Text = "STOP HOVER FARM [ON]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     else
-        ToggleBtn.Text = "START AUTO FARM [OFF]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        ToggleBtn.Text = "START HOVER FARM [OFF]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         StatusLbl.Text = "Status: Stopped"
+        ToggleHover(false) -- ปิดโหมดบินเมื่อกดหยุด
     end
 end)
 
-local CloseBtn = Instance.new("TextButton"); CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0); CloseBtn.BackgroundTransparency = 1; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.Parent = MainFrame; CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+local CloseBtn = Instance.new("TextButton"); CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0); CloseBtn.BackgroundTransparency = 1; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.Parent = MainFrame; CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy(); ToggleHover(false) end)
 
 ------------------------------------------------------
 -- ⚙️ LOGIC SYSTEM
 ------------------------------------------------------
-
--- ฟังก์ชันหาปุ่ม E (ประตู/ทางไปต่อ)
 local function FindExitPrompt()
-    -- ค้นหา ProximityPrompt ทั่วแมพ (เพราะบางทีประตูไม่ได้ชื่อ Door)
     for _, desc in ipairs(workspace:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then
-            return desc
-        end
+        if desc:IsA("ProximityPrompt") then return desc end
     end
     return nil
 end
 
 task.spawn(function()
     while true do
-        task.wait()
+        task.wait() -- ทำงานทุกเฟรม (เร็วสุด)
         if Toggles.AutoFarm then
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -75,68 +91,56 @@ task.spawn(function()
             if root and mobFolder then
                 local mobs = mobFolder:GetChildren()
                 
-                -- [[ CASE 1: มีมอนเหลืออยู่ -> ไล่ฆ่า ]]
+                -- [[ ⚔️ MODE: ฆ่ามอน ]]
                 if #mobs > 0 then
-                    StatusLbl.Text = "⚔️ Killing Mobs: " .. #mobs .. " left"
+                    StatusLbl.Text = "⚔️ Hovering & Killing..."
+                    ToggleHover(true) -- เปิดโหมดบิน
                     
-                    -- เลือกมอนตัวแรกที่เจอ
                     local target = mobs[1]
                     local tRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso")
                     
                     if tRoot then
-                        -- 1. วาปไปเหนือหัวมอน (มองลงล่าง)
+                        -- ล็อกตำแหน่งเหนือหัวมอนตลอดเวลา (กันมอนเดินหนีแล้วเราร่วง)
                         root.CFrame = CFrame.new(tRoot.Position + Vector3.new(0, CONFIG.HeightOffset, 0), tRoot.Position)
                         
-                        -- 2. ล็อกความเร็วตัวเรา (กันร่วง)
-                        root.Velocity = Vector3.zero
-                        
-                        -- 3. ยิงสกิล
+                        -- ยิงสกิล (ใส่ pcall กัน error)
                         pcall(function()
                             game:GetService("ReplicatedStorage").Remotes.AbilityHandler:FireServer(unpack(CONFIG.SkillArgs))
                         end)
-                        task.wait(CONFIG.AutoSkillDelay)
                     else
-                        -- มอนตัวนี้บั๊ก/ตายแล้ว -> ลบมันออกจากสายตา (Client side) เพื่อไปตัวถัดไป
                         target:Destroy()
                     end
                     
-                -- [[ CASE 2: มอนหมดเกลี้ยง -> หาทางออก ]]
+                -- [[ 🚪 MODE: หาทางออก ]]
                 else
+                    ToggleHover(false) -- ปิดโหมดบิน (จะได้เดินไปกดปุ่มได้สะดวก) หรือจะบินไปก็ได้ แต่เดินชัวร์กว่า
                     StatusLbl.Text = "🚪 Finding Exit..."
                     local exitPrompt = FindExitPrompt()
                     
                     if exitPrompt and exitPrompt.Parent then
-                        -- วาปไปหาปุ่ม E
                         local exitPart = exitPrompt.Parent
-                        if exitPart:IsA("BasePart") or exitPart:IsA("Model") then
-                            local exitPos = exitPart:IsA("Model") and exitPart:GetPivot().Position or exitPart.Position
-                            
-                            -- เช็กระยะ (ถ้าไกลค่อยวาป)
-                            if (root.Position - exitPos).Magnitude > 5 then
-                                root.CFrame = CFrame.new(exitPos + Vector3.new(0, 2, 0)) -- ยืนเหนือปุ่มนิดนึง
-                                StatusLbl.Text = "🚀 Warping to Exit..."
-                                task.wait(0.5)
-                            else
-                                -- ถึงแล้ว -> กด E รัวๆ
-                                StatusLbl.Text = "🔘 Pressing E..."
-                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                                task.wait(0.1)
-                                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                                
-                                -- สั่งกด ProximityPrompt โดยตรงด้วย (กันเหนียว)
-                                fireproximityprompt(exitPrompt) 
-                                task.wait(0.3)
-                            end
+                        local exitPos = exitPart:IsA("Model") and exitPart:GetPivot().Position or exitPart.Position
+                        
+                        if (root.Position - exitPos).Magnitude > 5 then
+                            root.CFrame = CFrame.new(exitPos + Vector3.new(0, 2, 0))
+                            StatusLbl.Text = "🚀 Warping to Exit..."
+                            task.wait(0.5)
+                        else
+                            StatusLbl.Text = "🔘 Pressing E..."
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                            task.wait(0.1)
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            fireproximityprompt(exitPrompt)
+                            task.wait(0.3)
                         end
                     else
-                        StatusLbl.Text = "⚠️ No Exit Found (Waiting...)"
+                        StatusLbl.Text = "⚠️ Waiting for Exit/Mobs..."
                         task.wait(1)
                     end
                 end
-            else
-                 -- กัน error กรณีตาย/แมพไม่โหลด
-                 task.wait(1)
             end
+        else
+            ToggleHover(false) -- ถ้าปิดออโต้ ก็ปิดบินด้วย
         end
     end
 end)
