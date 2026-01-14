@@ -6,9 +6,9 @@
 
 -- CONFIGURATION
 local CONFIG = {
-    HeightOffset = 8,  -- ความสูงเหนือหัวมอน (เพิ่มให้สูงขึ้นนิดนึงจะได้ปลอดภัย)
+    HeightOffset = 10,  -- ความสูงเหนือหัวมอน (เพิ่มให้สูงขึ้นนิดนึงจะได้ปลอดภัย)
     SkillArgs = {"MadaraThird"}, 
-    AutoSkillDelay = 0.5, 
+    AutoSkillDelay = 0.25, 
 }
 
 -- SERVICES
