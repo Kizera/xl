@@ -1,0 +1,161 @@
+--[[
+    🎮 UNIVERSAL FARM GUI [All-in-One]
+    - Auto Skill (MadaraThird)
+    - Mob Bring (รวบมอน)
+    - Auto Next Stage (วาปจบด่าน)
+]]
+
+-- SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- SETTINGS (ตั้งค่า)
+local CONFIG = {
+    NextStagePos = Vector3.new(497, 15, -72), -- พิกัดจบด่าน
+    MobDistance = 15, -- ระยะรวบมอน
+    SkillRemoteArgs = {"MadaraThird"} -- ชื่อสกิล
+}
+
+-- STATUS VARIABLES (ตัวแปรสถานะ)
+local Toggles = {
+    AutoSkill = false,
+    MobBring = false,
+    AutoNext = false
+}
+
+------------------------------------------------------
+-- 🖥️ GUI SYSTEM (สร้างหน้าต่าง)
+------------------------------------------------------
+if CoreGui:FindFirstChild("JemFarmUI") then CoreGui.JemFarmUI:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "JemFarmUI"
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 220, 0, 250)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- อยู่ซ้ายกลางจอ
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- หัวข้อ
+local Title = Instance.new("TextLabel")
+Title.Text = "⚡ JEM FARM HUB"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(255, 87, 34) -- สีส้ม
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+-- ฟังก์ชันสร้างปุ่ม
+local function CreateButton(text, yPos, onClick)
+    local btn = Instance.new("TextButton")
+    btn.Text = text .. " [OFF]"
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = MainFrame
+    
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            btn.Text = text .. " [ON]"
+            btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113) -- สีเขียว
+            btn.TextColor3 = Color3.new(1, 1, 1)
+        else
+            btn.Text = text .. " [OFF]"
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- สีเทา
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        onClick(enabled)
+    end)
+    return btn
+end
+
+-- สร้างปุ่มต่างๆ
+CreateButton("🔥 Auto Skill", 50, function(val) Toggles.AutoSkill = val end)
+CreateButton("🧲 Mob Bring", 95, function(val) Toggles.MobBring = val end)
+CreateButton("⏩ Auto Next", 140, function(val) Toggles.AutoNext = val end)
+
+-- ปุ่มปิด GUI เล็กๆ
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Text = "X"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0); CloseBtn.BackgroundTransparency = 1; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.Parent = MainFrame
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+------------------------------------------------------
+-- ⚙️ FUNCTION LOGIC (ระบบทำงาน)
+------------------------------------------------------
+
+-- 1. AUTO SKILL LOOP
+task.spawn(function()
+    while true do
+        task.wait(0.1) -- เช็คทุก 0.1 วิ (ปรับได้)
+        if Toggles.AutoSkill then
+            local remote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("AbilityHandler")
+            if remote then
+                remote:FireServer(unpack(CONFIG.SkillRemoteArgs))
+            end
+        end
+    end
+end)
+
+-- 2. MOB BRING LOOP
+RunService.RenderStepped:Connect(function()
+    if Toggles.MobBring then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local mobFolder = workspace:FindFirstChild("Live")
+
+        if root and mobFolder then
+            local bringPos = root.CFrame * CFrame.new(0, 2, -CONFIG.MobDistance)
+            for _, mob in ipairs(mobFolder:GetChildren()) do
+                local mRoot = mob:FindFirstChild("HumanoidRootPart") or mob:FindFirstChild("Torso")
+                if mRoot then
+                    mRoot.CFrame = bringPos
+                    mRoot.CanCollide = false
+                    mRoot.Velocity = Vector3.zero
+                end
+            end
+        end
+    end
+end)
+
+-- 3. AUTO NEXT STAGE LOOP
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if Toggles.AutoNext then
+            local mobFolder = workspace:FindFirstChild("Live")
+            if mobFolder and #mobFolder:GetChildren() == 0 then
+                -- มอนหมด -> วาป
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    -- เช็คระยะห่างก่อนวาป (กันวาปรัวๆ)
+                    if (root.Position - CONFIG.NextStagePos).Magnitude > 10 then
+                        root.CFrame = CFrame.new(CONFIG.NextStagePos)
+                        task.wait(0.5)
+                        -- กด E
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        print("⏩ Warped & Pressed E")
+                    end
+                end
+            end
+        end
+    end
+end)
