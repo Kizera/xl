@@ -1,8 +1,13 @@
 --[[
-    ☠️ JEM DUNGEON V6.5 [DEBUG MODE]
-    - เน้นแก้ปัญหา "ยืนนิ่ง"
-    - ขึ้นสถานะตัวโตๆ ว่าติดขั้นตอนไหน
+    ☠️ JEM DUNGEON V8 [FINAL FUSION]
+    - Base: V4 (Interaction Fix + Warp Logic)
+    - Upgrade: V6 Realtime Auto-Skill Detect (No more typing!)
 ]]
+
+-- CONFIG
+local CONFIG = {
+    HeightOffset = 12,
+}
 
 -- SERVICES
 local Players = game:GetService("Players")
@@ -12,23 +17,29 @@ local LocalPlayer = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- CONFIG & STATE
-local CONFIG = { HeightOffset = 12 }
+-- STATE
 local Toggles = { AutoFarm = false }
 local DetectedSkills = {} 
 
--- 🖥️ GUI SETUP
-if CoreGui:FindFirstChild("JemDebug") then CoreGui.JemDebug:Destroy() end
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "JemDebug"; ScreenGui.Parent = CoreGui
-local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 280, 0, 150); MainFrame.Position = UDim2.new(0.5, -140, 0.2, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); MainFrame.Active = true; MainFrame.Draggable = true; MainFrame.Parent = ScreenGui
+------------------------------------------------------
+-- 🖥️ GUI SYSTEM
+------------------------------------------------------
+if CoreGui:FindFirstChild("JemV8") then CoreGui.JemV8:Destroy() end
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "JemV8"; ScreenGui.Parent = CoreGui
+local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 260, 0, 200); MainFrame.Position = UDim2.new(0.5, -130, 0.2, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25); MainFrame.Active = true; MainFrame.Draggable = true; MainFrame.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel"); Title.Text = "🔧 JEM V6.5 DEBUG"; Title.Size = UDim2.new(1, 0, 0, 30); Title.BackgroundColor3 = Color3.fromRGB(230, 126, 34); Title.Parent = MainFrame
+local Title = Instance.new("TextLabel"); Title.Text = "☠️ JEM V8 (FINAL)"; Title.Size = UDim2.new(1, 0, 0, 40); Title.BackgroundColor3 = Color3.fromRGB(192, 57, 43); Title.TextColor3 = Color3.new(1, 1, 1); Title.Font = Enum.Font.GothamBold; Title.Parent = MainFrame
 
-local StatusLbl = Instance.new("TextLabel"); StatusLbl.Text = "WAITING TO START..."; StatusLbl.Size = UDim2.new(1, 0, 0, 50); StatusLbl.Position = UDim2.new(0, 0, 0, 30); StatusLbl.BackgroundTransparency = 1; StatusLbl.TextColor3 = Color3.fromRGB(255, 255, 0); StatusLbl.TextScaled = true; StatusLbl.Parent = MainFrame
+local StatusLbl = Instance.new("TextLabel"); StatusLbl.Text = "Status: Idle"; StatusLbl.Size = UDim2.new(1, 0, 0, 30); StatusLbl.Position = UDim2.new(0, 0, 0, 40); StatusLbl.BackgroundTransparency = 1; StatusLbl.TextColor3 = Color3.fromRGB(255, 200, 0); StatusLbl.Parent = MainFrame
 
-local ToggleBtn = Instance.new("TextButton"); ToggleBtn.Text = "START [OFF]"; ToggleBtn.Size = UDim2.new(0.9, 0, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0, 90); ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); ToggleBtn.TextColor3 = Color3.new(1, 1, 1); ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.Parent = MainFrame
+-- เปลี่ยนจากช่องกรอก เป็นป้ายโชว์สกิลที่เจอ
+local SkillLbl = Instance.new("TextLabel"); SkillLbl.Text = "Waiting for Weapon..."; SkillLbl.Size = UDim2.new(0.9, 0, 0, 30); SkillLbl.Position = UDim2.new(0.05, 0, 0, 70); SkillLbl.BackgroundColor3 = Color3.fromRGB(40, 40, 40); SkillLbl.TextColor3 = Color3.new(0.8, 0.8, 0.8); SkillLbl.Font = Enum.Font.Gotham; SkillLbl.TextScaled = true; SkillLbl.Parent = MainFrame
 
--- HOVER
+local ToggleBtn = Instance.new("TextButton"); ToggleBtn.Text = "START FARM [OFF]"; ToggleBtn.Size = UDim2.new(0.9, 0, 0, 50); ToggleBtn.Position = UDim2.new(0.05, 0, 0, 110); ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); ToggleBtn.TextColor3 = Color3.new(1, 1, 1); ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.Parent = MainFrame
+
+local CloseBtn = Instance.new("TextButton"); CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0); CloseBtn.BackgroundTransparency = 1; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.Parent = MainFrame
+
+-- Hover Function
 local function ToggleHover(state)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -45,15 +56,17 @@ end
 ToggleBtn.MouseButton1Click:Connect(function()
     Toggles.AutoFarm = not Toggles.AutoFarm
     if Toggles.AutoFarm then
-        ToggleBtn.Text = "STOP [ON]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-        StatusLbl.Text = "STARTED!"
+        ToggleBtn.Text = "STOP FARM [ON]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     else
-        ToggleBtn.Text = "START [OFF]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        StatusLbl.Text = "STOPPED"; ToggleHover(false)
+        ToggleBtn.Text = "START FARM [OFF]"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        StatusLbl.Text = "Status: Stopped"; ToggleHover(false)
     end
 end)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy(); ToggleHover(false) end)
 
--- SKILL UPDATE
+------------------------------------------------------
+-- ⚡ REALTIME SKILL DETECT (ระบบ V6)
+------------------------------------------------------
 local function UpdateSkills()
     local char = LocalPlayer.Character
     local found = {}
@@ -61,6 +74,7 @@ local function UpdateSkills()
         local tool = char:FindFirstChildOfClass("Tool")
         if tool then
             for _, c in ipairs(tool:GetChildren()) do
+                -- กรองเอาเฉพาะชื่อสกิล
                 if c:IsA("LocalScript") and not (c.Name == "Animate" or c.Name == "Client" or c.Name == "Handler") then
                     table.insert(found, c.Name)
                 end
@@ -68,82 +82,126 @@ local function UpdateSkills()
         end
     end
     DetectedSkills = found
+    if #DetectedSkills > 0 then
+        SkillLbl.Text = "Skills: " .. table.concat(DetectedSkills, ", ")
+    else
+        SkillLbl.Text = "No Weapon / Skills Found"
+    end
 end
 
--- MAIN LOOP
+-- เชื่อมต่อ Event ให้ทำงานทันที
+local function ConnectChar(char)
+    if not char then return end
+    char.ChildAdded:Connect(UpdateSkills)
+    char.ChildRemoved:Connect(UpdateSkills)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then tool.ChildAdded:Connect(UpdateSkills) end
+end
+LocalPlayer.CharacterAdded:Connect(ConnectChar)
+if LocalPlayer.Character then ConnectChar(LocalPlayer.Character) end
+
+-- Loop กันเหนียว (Backup)
+task.spawn(function() while true do task.wait(1) UpdateSkills() end end)
+
+------------------------------------------------------
+-- ⚙️ LOGIC SYSTEM (ระบบ V4)
+------------------------------------------------------
+-- Anti-AFK
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+-- ฟังก์ชันหาปุ่มกด (หาอันที่ใกล้ที่สุด หรืออันที่มีคำว่า Move)
+local function FindExitPrompt()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local bestPrompt = nil
+    local minDistance = math.huge
+    
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            -- กรองหาปุ่ม
+            local actionText = desc.ActionText:lower()
+            if actionText:find("move") or actionText:find("next") or actionText:find("talk") or actionText:find("interact") then
+                local dist = (root.Position - desc.Parent:GetPivot().Position).Magnitude
+                if dist < minDistance then
+                    minDistance = dist
+                    bestPrompt = desc
+                end
+            end
+        end
+    end
+    return bestPrompt
+end
+
 task.spawn(function()
     while true do
-        task.wait()
-        
-        -- อัปเดตสกิลตลอดเวลา
-        pcall(UpdateSkills)
-        
+        task.wait() -- เร็วสุด (Realtime Loop)
         if Toggles.AutoFarm then
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            -- 1. เช็กตัวละคร
-            if not root then 
-                StatusLbl.Text = "❌ No Character Found"
-                continue 
-            end
-            
-            -- 2. เช็กโฟลเดอร์มอนสเตอร์
             local mobFolder = workspace:FindFirstChild("Live")
-            if not mobFolder then
-                StatusLbl.Text = "❌ No 'Live' Folder (Waiting...)"
-                continue
-            end
-            
-            local mobs = mobFolder:GetChildren()
-            
-            -- 3. ตัดสินใจ
-            if #mobs > 0 then
-                -- [[ ⚔️ ตีมอน ]]
-                local target = mobs[1]
-                local tHum = target:FindFirstChild("Humanoid")
-                local tRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso")
+
+            if root and mobFolder then
+                local mobs = mobFolder:GetChildren()
                 
-                if tHum and tRoot and tHum.Health > 0 then
-                    StatusLbl.Text = "⚔️ Attacking: " .. target.Name
-                    ToggleHover(true)
-                    root.CFrame = CFrame.new(tRoot.Position + Vector3.new(0, CONFIG.HeightOffset, 0), tRoot.Position)
+                -- [[ ⚔️ MODE: KILL MOBS ]]
+                if #mobs > 0 then
+                    local target = mobs[1]
+                    local tRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso")
                     
-                    if #DetectedSkills > 0 then
-                        for _, s in ipairs(DetectedSkills) do
-                            game:GetService("ReplicatedStorage").Remotes.AbilityHandler:FireServer(s)
+                    if tRoot and target:FindFirstChild("Humanoid") and target.Humanoid.Health > 0 then
+                        StatusLbl.Text = "⚔️ Firing " .. #DetectedSkills .. " Skills"
+                        ToggleHover(true)
+                        root.CFrame = CFrame.new(tRoot.Position + Vector3.new(0, CONFIG.HeightOffset, 0), tRoot.Position)
+                        
+                        -- 🔥 ยิงสกิลอัตโนมัติ (จาก V6)
+                        if #DetectedSkills > 0 then
+                            for _, skill in ipairs(DetectedSkills) do
+                                task.spawn(function()
+                                    game:GetService("ReplicatedStorage").Remotes.AbilityHandler:FireServer(skill)
+                                end)
+                            end
+                        else
+                             -- ถ้าไม่เจอสกิล ให้คลิกตี
+                            VirtualUser:ClickButton1(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
                         end
                     else
-                        StatusLbl.Text = "⚠️ No Skills Found! (Clicking)"
-                        VirtualUser:ClickButton1(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                        table.remove(mobs, 1)
                     end
+                    
+                -- [[ 🚪 MODE: NEXT FLOOR ]]
                 else
-                    table.remove(mobs, 1) -- มอนตัวนี้ตาย/บัค ข้ามไปตัวถัดไป
-                end
-            else
-                -- [[ 🚪 หาทางออก ]]
-                ToggleHover(false)
-                StatusLbl.Text = "🚪 Finding Exit..."
-                
-                local exitPrompt = nil
-                local minDist = math.huge
-                
-                for _, d in ipairs(workspace:GetDescendants()) do
-                    if d:IsA("ProximityPrompt") then
-                        -- เอาหมดไม่สนลูกใคร (เผื่อชื่อปุ่มเปลี่ยน)
-                        local dist = (root.Position - d.Parent:GetPivot().Position).Magnitude
-                        if dist < minDist then minDist = dist; exitPrompt = d end
+                    ToggleHover(false)
+                    StatusLbl.Text = "🚪 Finding Exit..."
+                    local exitPrompt = FindExitPrompt()
+                    
+                    if exitPrompt and exitPrompt.Parent then
+                        local exitPart = exitPrompt.Parent
+                        
+                        -- 🛠️ HACK PROMPT (จาก V4)
+                        exitPrompt.HoldDuration = 0
+                        exitPrompt.MaxActivationDistance = 50 
+                        exitPrompt.RequiresLineOfSight = false
+                        
+                        local promptPos = exitPart:IsA("Model") and exitPart:GetPivot().Position or exitPart.Position
+                        
+                        -- วาปไปสิงร่าง (จาก V4)
+                        if (root.Position - promptPos).Magnitude > 3 then
+                            StatusLbl.Text = "🚀 Warping to NPC..."
+                            root.CFrame = CFrame.new(promptPos) 
+                        else
+                            StatusLbl.Text = "🔘 Interacting..."
+                            fireproximityprompt(exitPrompt)
+                            task.wait(0.1)
+                        end
+                    else
+                        StatusLbl.Text = "⚠️ No Exit Found!"
                     end
-                end
-                
-                if exitPrompt then
-                    StatusLbl.Text = "🚀 Going to: " .. exitPrompt.Parent.Name
-                    exitPrompt.HoldDuration = 0
-                    exitPrompt.MaxActivationDistance = 50
-                    root.CFrame = CFrame.new(exitPrompt.Parent:GetPivot().Position)
-                    fireproximityprompt(exitPrompt)
-                else
-                    StatusLbl.Text = "⚠️ NO EXIT FOUND?!"
                 end
             end
         else
